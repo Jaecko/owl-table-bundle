@@ -1,0 +1,10 @@
+services:
+    OwlConcept\TableBundle\Builder\TableBuilder:
+        arguments:
+            $defaultMode: '%owl_table.default_mode%'
+            $defaultPerPage: '%owl_table.default_per_page%'
+            $cssClassPrefix: '%owl_table.css_class_prefix%'
+        public: true
+
+    OwlConcept\TableBundle\Twig\OwlTableTwigExtension:
+        tags: ['twig.extension']

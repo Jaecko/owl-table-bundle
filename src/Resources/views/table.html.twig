@@ -1,0 +1,66 @@
+{% set prefix = table.cssClassPrefix %}
+
+<div class="{{ prefix }}-wrapper"
+     id="{{ table.id }}"
+     data-owl-table-id="{{ table.id }}"
+     data-owl-table-mode="{{ table.mode }}"
+     {% if table.clientMode %}
+         data-owl-table-data="{{ table.jsonData }}"
+         data-owl-table-columns="{{ table.jsonColumns }}"
+         data-owl-table-per-page="{{ table.pagination.perPage }}"
+     {% endif %}
+>
+    <table class="{{ prefix }}">
+        <thead class="{{ prefix }}__head">
+            <tr class="{{ prefix }}__head-row">
+                {% for column in table.columns %}
+                    <th class="{{ prefix }}__th{{ column.cssClass ? ' ' ~ column.cssClass : '' }}{% if column.sortable %} {{ prefix }}__th--sortable{% endif %}{% if table.sortField == column.key %} {{ prefix }}__th--sorted {{ prefix }}__th--{{ table.sortDirection }}{% endif %}"
+                        {% if column.sortable %}
+                            data-sort-key="{{ column.key }}"
+                        {% endif %}
+                    >
+                        {% if column.sortable and table.serverMode %}
+                            <a href="{{ owl_table_sort_url(table, column.key) }}"
+                               class="{{ prefix }}__sort-link">
+                                {{ column.label }}
+                                <span class="{{ prefix }}__sort-icon"></span>
+                            </a>
+                        {% elseif column.sortable and table.clientMode %}
+                            <button type="button"
+                                    class="{{ prefix }}__sort-btn"
+                                    data-sort-key="{{ column.key }}">
+                                {{ column.label }}
+                                <span class="{{ prefix }}__sort-icon"></span>
+                            </button>
+                        {% else %}
+                            {{ column.label }}
+                        {% endif %}
+                    </th>
+                {% endfor %}
+            </tr>
+        </thead>
+
+        <tbody class="{{ prefix }}__body">
+            {% for row in table.rows %}
+                <tr class="{{ prefix }}__row {{ cycle([prefix ~ '__row--odd', prefix ~ '__row--even'], loop.index0) }}">
+                    {% for column in table.columns %}
+                        <td class="{{ prefix }}__td{{ column.cssClass ? ' ' ~ column.cssClass : '' }}"
+                            data-label="{{ column.label }}"
+                            data-column-key="{{ column.key }}"
+                        >
+                            {{ owl_table_cell(column, row[column.key] ?? '') }}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% else %}
+                <tr class="{{ prefix }}__row--empty">
+                    <td colspan="{{ table.columns|length }}" class="{{ prefix }}__td--empty">
+                        Aucun r&eacute;sultat.
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% include '@OwlTable/pagination.html.twig' with { table: table } only %}
+</div>

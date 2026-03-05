@@ -1,0 +1,67 @@
+{% set prefix = table.cssClassPrefix %}
+{% set pagination = table.pagination %}
+
+{% if pagination.totalPages > 1 %}
+<nav class="{{ prefix }}-pagination"
+     aria-label="Pagination"
+     data-owl-table-pagination-for="{{ table.id }}"
+>
+    <ul class="{{ prefix }}-pagination__list">
+        {# Previous #}
+        <li class="{{ prefix }}-pagination__item{{ not pagination.hasPreviousPage ? ' ' ~ prefix ~ '-pagination__item--disabled' : '' }}">
+            {% if table.serverMode %}
+                <a href="?{{ app.request.query.all|merge({page: pagination.currentPage - 1})|url_encode }}"
+                   class="{{ prefix }}-pagination__link {{ prefix }}-pagination__link--prev"
+                   {% if not pagination.hasPreviousPage %}aria-disabled="true" tabindex="-1"{% endif %}
+                >&laquo; Pr&eacute;c&eacute;dent</a>
+            {% else %}
+                <button type="button"
+                        class="{{ prefix }}-pagination__link {{ prefix }}-pagination__link--prev"
+                        data-page="{{ pagination.currentPage - 1 }}"
+                        {% if not pagination.hasPreviousPage %}disabled{% endif %}
+                >&laquo; Pr&eacute;c&eacute;dent</button>
+            {% endif %}
+        </li>
+
+        {# Page numbers #}
+        {% for page in pagination.pageRange %}
+            {% if page is null %}
+                <li class="{{ prefix }}-pagination__item {{ prefix }}-pagination__item--ellipsis">
+                    <span class="{{ prefix }}-pagination__ellipsis">&hellip;</span>
+                </li>
+            {% else %}
+                <li class="{{ prefix }}-pagination__item{{ page == pagination.currentPage ? ' ' ~ prefix ~ '-pagination__item--active' : '' }}">
+                    {% if table.serverMode %}
+                        <a href="?{{ app.request.query.all|merge({page: page})|url_encode }}"
+                           class="{{ prefix }}-pagination__link"
+                           {% if page == pagination.currentPage %}aria-current="page"{% endif %}
+                        >{{ page }}</a>
+                    {% else %}
+                        <button type="button"
+                                class="{{ prefix }}-pagination__link"
+                                data-page="{{ page }}"
+                                {% if page == pagination.currentPage %}aria-current="page"{% endif %}
+                        >{{ page }}</button>
+                    {% endif %}
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {# Next #}
+        <li class="{{ prefix }}-pagination__item{{ not pagination.hasNextPage ? ' ' ~ prefix ~ '-pagination__item--disabled' : '' }}">
+            {% if table.serverMode %}
+                <a href="?{{ app.request.query.all|merge({page: pagination.currentPage + 1})|url_encode }}"
+                   class="{{ prefix }}-pagination__link {{ prefix }}-pagination__link--next"
+                   {% if not pagination.hasNextPage %}aria-disabled="true" tabindex="-1"{% endif %}
+                >Suivant &raquo;</a>
+            {% else %}
+                <button type="button"
+                        class="{{ prefix }}-pagination__link {{ prefix }}-pagination__link--next"
+                        data-page="{{ pagination.currentPage + 1 }}"
+                        {% if not pagination.hasNextPage %}disabled{% endif %}
+                >Suivant &raquo;</button>
+            {% endif %}
+        </li>
+    </ul>
+</nav>
+{% endif %}

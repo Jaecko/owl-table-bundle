@@ -1,0 +1,77 @@
+{% set prefix = table.cssClassPrefix %}
+
+{% if table.hasFilters %}
+<div class="{{ prefix }}-filters"
+     data-owl-table-filters-for="{{ table.id }}"
+>
+    {% if table.serverMode %}
+    <form method="get" action="" class="{{ prefix }}-filters__form">
+        {% if app.request.query.get('sort') %}
+            <input type="hidden" name="sort" value="{{ app.request.query.get('sort') }}">
+        {% endif %}
+        {% if app.request.query.get('direction') %}
+            <input type="hidden" name="direction" value="{{ app.request.query.get('direction') }}">
+        {% endif %}
+        <input type="hidden" name="page" value="1">
+    {% endif %}
+
+        <div class="{{ prefix }}-filters__fields">
+            {% for column in table.filterableColumns %}
+                <div class="{{ prefix }}-filters__field" data-filter-key="{{ column.key }}">
+                    <label class="{{ prefix }}-filters__label"
+                           for="{{ table.id }}_filter_{{ column.key }}">
+                        {{ column.label }}
+                    </label>
+
+                    {% if column.filterType == 'text' %}
+                        <input type="text"
+                               id="{{ table.id }}_filter_{{ column.key }}"
+                               name="filter[{{ column.key }}]"
+                               value="{{ table.activeFilters[column.key] ?? '' }}"
+                               placeholder="Filtrer {{ column.label|lower }}..."
+                               class="{{ prefix }}-filters__input {{ prefix }}-filters__input--text"
+                        >
+
+                    {% elseif column.filterType == 'select' %}
+                        <select id="{{ table.id }}_filter_{{ column.key }}"
+                                name="filter[{{ column.key }}]"
+                                class="{{ prefix }}-filters__input {{ prefix }}-filters__input--select"
+                        >
+                            <option value="">-- Tous --</option>
+                            {% for option in column.filterOptions %}
+                                <option value="{{ option }}"
+                                    {% if (table.activeFilters[column.key] ?? '') == option %}selected{% endif %}
+                                >{{ option }}</option>
+                            {% endfor %}
+                        </select>
+
+                    {% elseif column.filterType == 'date_range' %}
+                        <div class="{{ prefix }}-filters__date-range">
+                            <input type="date"
+                                   id="{{ table.id }}_filter_{{ column.key }}_from"
+                                   name="filter[{{ column.key }}][from]"
+                                   value="{{ table.activeFilters[column.key]['from'] ?? '' }}"
+                                   class="{{ prefix }}-filters__input {{ prefix }}-filters__input--date"
+                            >
+                            <span class="{{ prefix }}-filters__date-separator">au</span>
+                            <input type="date"
+                                   id="{{ table.id }}_filter_{{ column.key }}_to"
+                                   name="filter[{{ column.key }}][to]"
+                                   value="{{ table.activeFilters[column.key]['to'] ?? '' }}"
+                                   class="{{ prefix }}-filters__input {{ prefix }}-filters__input--date"
+                            >
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+    {% if table.serverMode %}
+        <div class="{{ prefix }}-filters__actions">
+            <button type="submit" class="{{ prefix }}-filters__submit">Filtrer</button>
+            <a href="?" class="{{ prefix }}-filters__reset">R&eacute;initialiser</a>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endif %}
