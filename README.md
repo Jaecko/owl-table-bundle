@@ -31,6 +31,7 @@
 
 ### Fonctionnalités
 
+- **Colonnes auto-détectées** — les colonnes sont générées automatiquement à partir des clés de vos données
 - **Génération dynamique de tableaux** via un composant Twig réutilisable
 - **Tri des colonnes** — côté serveur (rechargement de page) ou côté client (JavaScript)
 - **Filtres configurables** — texte libre, liste déroulante, plage de dates
@@ -99,51 +100,92 @@ owl_table:
 
 ### Utilisation
 
-#### Dans le controller
+#### Exemple minimal — tableau automatique
+
+Passez simplement vos données, le tableau se construit tout seul :
 
 ```php
 use OwlConcept\TableBundle\Builder\TableBuilder;
-use Symfony\Component\HttpFoundation\Request;
 
 #[Route('/users', name: 'users_list')]
-public function list(Request $request, TableBuilder $tableBuilder): Response
+public function list(TableBuilder $tableBuilder): Response
 {
     $users = [
-        ['name' => 'Alice', 'email' => 'alice@example.com', 'role' => 'Admin', 'created_at' => '2024-01-15'],
-        ['name' => 'Bob', 'email' => 'bob@example.com', 'role' => 'User', 'created_at' => '2024-03-22'],
-        // ...
+        ['name' => 'Alice', 'email' => 'alice@example.com', 'role' => 'Admin'],
+        ['name' => 'Bob', 'email' => 'bob@example.com', 'role' => 'User'],
     ];
 
     $table = $tableBuilder->create('users_table')
-        ->addColumn('name', 'Nom', [
-            'sortable' => true,
-            'filterable' => true,
-            'filter_type' => 'text',
-        ])
-        ->addColumn('email', 'Email', [
-            'sortable' => true,
-        ])
-        ->addColumn('role', 'Rôle', [
-            'filterable' => true,
-            'filter_type' => 'select',
-            'filter_options' => ['Admin', 'User', 'Editor'],
-        ])
-        ->addColumn('created_at', 'Créé le', [
-            'sortable' => true,
-            'filterable' => true,
-            'filter_type' => 'date_range',
-        ])
-        ->setMode('server')
-        ->setData($users)
-        ->setPagination(
-            page: $request->query->getInt('page', 1),
-            perPage: 20,
-        )
-        ->handleRequest($request)
+        ->setData($users)  // Les colonnes "name", "email", "role" sont auto-détectées
         ->build();
 
     return $this->render('user/list.html.twig', ['table' => $table]);
 }
+```
+
+> Les en-têtes sont générés automatiquement : `created_at` → **Created at**, `firstName` → **First name**, `email` → **Email**
+
+#### Configurer certaines colonnes (optionnel)
+
+Utilisez `configureColumn()` pour ajouter du tri, des filtres ou un label personnalisé sur des colonnes spécifiques :
+
+```php
+$table = $tableBuilder->create('users_table')
+    ->setData($users)
+    ->configureColumn('name', [
+        'label' => 'Nom',
+        'sortable' => true,
+        'filterable' => true,
+        'filter_type' => 'text',
+    ])
+    ->configureColumn('email', [
+        'sortable' => true,
+    ])
+    ->configureColumn('role', [
+        'label' => 'Rôle',
+        'filterable' => true,
+        'filter_type' => 'select',
+        'filter_options' => ['Admin', 'User', 'Editor'],
+    ])
+    ->configureColumn('created_at', [
+        'label' => 'Créé le',
+        'sortable' => true,
+        'filterable' => true,
+        'filter_type' => 'date_range',
+    ])
+    ->setMode('server')
+    ->setPagination(page: $request->query->getInt('page', 1), perPage: 20)
+    ->handleRequest($request)
+    ->build();
+```
+
+> Seules les colonnes que vous voulez personnaliser ont besoin de `configureColumn()`. Les autres s'affichent automatiquement avec un label déduit de la clé.
+
+#### Options de `configureColumn()`
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `label` | `string` | Label personnalisé pour l'en-tête (sinon auto-généré depuis la clé) |
+| `sortable` | `bool` | Activer le tri sur cette colonne |
+| `filterable` | `bool` | Activer un filtre sur cette colonne |
+| `filter_type` | `string` | Type de filtre : `text`, `select`, `date_range` |
+| `filter_options` | `array` | Valeurs possibles pour un filtre `select` |
+| `css_class` | `string` | Classe CSS supplémentaire sur les cellules |
+| `formatter` | `Closure` | Fonction de formatage de la valeur affichée |
+
+#### Colonnes avec des données hétérogènes
+
+Si certaines lignes ont des clés que d'autres n'ont pas, le tableau détecte l'union de toutes les clés :
+
+```php
+$data = [
+    ['name' => 'Alice', 'email' => 'alice@example.com'],
+    ['name' => 'Bob', 'email' => 'bob@example.com', 'phone' => '06 12 34 56 78'],
+];
+
+// Résultat : 3 colonnes → Name, Email, Phone
+// Alice aura une cellule vide pour "Phone"
+$table = $tableBuilder->create('contacts')->setData($data)->build();
 ```
 
 #### Dans le template Twig
@@ -166,26 +208,27 @@ public function list(Request $request, TableBuilder $tableBuilder): Response
 
 #### Avec des entités Doctrine
 
-Le builder supporte directement les objets (via les getters) :
+Le builder supporte directement les objets (via les getters et propriétés publiques) :
 
 ```php
 $users = $userRepository->findAll();
 
+// Les colonnes sont détectées via getName(), getEmail(), getRole(), etc.
 $table = $tableBuilder->create('users_table')
-    ->addColumn('name', 'Nom', ['sortable' => true])
-    ->addColumn('email', 'Email', ['sortable' => true])
-    ->setData($users) // Les getters getName(), getEmail() sont appelés automatiquement
+    ->setData($users)
+    ->configureColumn('name', ['sortable' => true])
+    ->configureColumn('email', ['sortable' => true])
     ->build();
 ```
 
 #### Formateur personnalisé
 
 ```php
-->addColumn('price', 'Prix', [
+->configureColumn('price', [
     'sortable' => true,
     'formatter' => fn($value) => number_format($value, 2, ',', ' ') . ' €',
 ])
-->addColumn('active', 'Actif', [
+->configureColumn('active', [
     'formatter' => fn($value) => $value ? 'Oui' : 'Non',
 ])
 ```
@@ -214,8 +257,9 @@ En mode serveur avec une base de données, utilisez les accesseurs du builder po
 
 ```php
 $table = $tableBuilder->create('users_table')
-    ->addColumn('name', 'Nom', ['sortable' => true, 'filterable' => true, 'filter_type' => 'text'])
-    ->addColumn('email', 'Email', ['sortable' => true])
+    ->setData([]) // données vides pour l'instant
+    ->configureColumn('name', ['sortable' => true, 'filterable' => true, 'filter_type' => 'text'])
+    ->configureColumn('email', ['sortable' => true])
     ->setMode('server')
     ->handleRequest($request);
 
@@ -244,6 +288,7 @@ $table = $tableBuilder
 
 ### Features
 
+- **Auto-detected columns** — columns are automatically generated from your data keys
 - **Dynamic table generation** via a reusable Twig component
 - **Column sorting** — server-side (page reload) or client-side (JavaScript)
 - **Configurable filters** — free text, dropdown select, date range
@@ -312,51 +357,91 @@ owl_table:
 
 ### Usage
 
-#### In the controller
+#### Minimal example — automatic table
+
+Just pass your data, the table builds itself:
 
 ```php
 use OwlConcept\TableBundle\Builder\TableBuilder;
-use Symfony\Component\HttpFoundation\Request;
 
 #[Route('/users', name: 'users_list')]
-public function list(Request $request, TableBuilder $tableBuilder): Response
+public function list(TableBuilder $tableBuilder): Response
 {
     $users = [
-        ['name' => 'Alice', 'email' => 'alice@example.com', 'role' => 'Admin', 'created_at' => '2024-01-15'],
-        ['name' => 'Bob', 'email' => 'bob@example.com', 'role' => 'User', 'created_at' => '2024-03-22'],
-        // ...
+        ['name' => 'Alice', 'email' => 'alice@example.com', 'role' => 'Admin'],
+        ['name' => 'Bob', 'email' => 'bob@example.com', 'role' => 'User'],
     ];
 
     $table = $tableBuilder->create('users_table')
-        ->addColumn('name', 'Name', [
-            'sortable' => true,
-            'filterable' => true,
-            'filter_type' => 'text',
-        ])
-        ->addColumn('email', 'Email', [
-            'sortable' => true,
-        ])
-        ->addColumn('role', 'Role', [
-            'filterable' => true,
-            'filter_type' => 'select',
-            'filter_options' => ['Admin', 'User', 'Editor'],
-        ])
-        ->addColumn('created_at', 'Created at', [
-            'sortable' => true,
-            'filterable' => true,
-            'filter_type' => 'date_range',
-        ])
-        ->setMode('server')
-        ->setData($users)
-        ->setPagination(
-            page: $request->query->getInt('page', 1),
-            perPage: 20,
-        )
-        ->handleRequest($request)
+        ->setData($users)  // Columns "name", "email", "role" are auto-detected
         ->build();
 
     return $this->render('user/list.html.twig', ['table' => $table]);
 }
+```
+
+> Headers are generated automatically: `created_at` → **Created at**, `firstName` → **First name**, `email` → **Email**
+
+#### Configure specific columns (optional)
+
+Use `configureColumn()` to add sorting, filters, or a custom label to specific columns:
+
+```php
+$table = $tableBuilder->create('users_table')
+    ->setData($users)
+    ->configureColumn('name', [
+        'label' => 'Full Name',
+        'sortable' => true,
+        'filterable' => true,
+        'filter_type' => 'text',
+    ])
+    ->configureColumn('email', [
+        'sortable' => true,
+    ])
+    ->configureColumn('role', [
+        'filterable' => true,
+        'filter_type' => 'select',
+        'filter_options' => ['Admin', 'User', 'Editor'],
+    ])
+    ->configureColumn('created_at', [
+        'label' => 'Created at',
+        'sortable' => true,
+        'filterable' => true,
+        'filter_type' => 'date_range',
+    ])
+    ->setMode('server')
+    ->setPagination(page: $request->query->getInt('page', 1), perPage: 20)
+    ->handleRequest($request)
+    ->build();
+```
+
+> Only the columns you want to customize need `configureColumn()`. All others display automatically with a label derived from the key.
+
+#### `configureColumn()` options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `label` | `string` | Custom header label (otherwise auto-generated from key) |
+| `sortable` | `bool` | Enable sorting on this column |
+| `filterable` | `bool` | Enable a filter on this column |
+| `filter_type` | `string` | Filter type: `text`, `select`, `date_range` |
+| `filter_options` | `array` | Possible values for a `select` filter |
+| `css_class` | `string` | Extra CSS class on cells |
+| `formatter` | `Closure` | Custom value formatting function |
+
+#### Heterogeneous data
+
+If some rows have keys that others don't, the table detects the union of all keys:
+
+```php
+$data = [
+    ['name' => 'Alice', 'email' => 'alice@example.com'],
+    ['name' => 'Bob', 'email' => 'bob@example.com', 'phone' => '+33 6 12 34 56 78'],
+];
+
+// Result: 3 columns → Name, Email, Phone
+// Alice will have an empty cell for "Phone"
+$table = $tableBuilder->create('contacts')->setData($data)->build();
 ```
 
 #### In the Twig template
@@ -379,26 +464,27 @@ public function list(Request $request, TableBuilder $tableBuilder): Response
 
 #### With Doctrine entities
 
-The builder supports objects directly (via getters):
+The builder supports objects directly (via getters and public properties):
 
 ```php
 $users = $userRepository->findAll();
 
+// Columns are detected via getName(), getEmail(), getRole(), etc.
 $table = $tableBuilder->create('users_table')
-    ->addColumn('name', 'Name', ['sortable' => true])
-    ->addColumn('email', 'Email', ['sortable' => true])
-    ->setData($users) // Automatically calls getName(), getEmail()
+    ->setData($users)
+    ->configureColumn('name', ['sortable' => true])
+    ->configureColumn('email', ['sortable' => true])
     ->build();
 ```
 
 #### Custom formatter
 
 ```php
-->addColumn('price', 'Price', [
+->configureColumn('price', [
     'sortable' => true,
     'formatter' => fn($value) => '$' . number_format($value, 2),
 ])
-->addColumn('active', 'Active', [
+->configureColumn('active', [
     'formatter' => fn($value) => $value ? 'Yes' : 'No',
 ])
 ```
@@ -427,8 +513,9 @@ In server mode with a database, use the builder's accessors to build your querie
 
 ```php
 $table = $tableBuilder->create('users_table')
-    ->addColumn('name', 'Name', ['sortable' => true, 'filterable' => true, 'filter_type' => 'text'])
-    ->addColumn('email', 'Email', ['sortable' => true])
+    ->setData([]) // empty data for now
+    ->configureColumn('name', ['sortable' => true, 'filterable' => true, 'filter_type' => 'text'])
+    ->configureColumn('email', ['sortable' => true])
     ->setMode('server')
     ->handleRequest($request);
 

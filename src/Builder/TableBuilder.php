@@ -14,11 +14,17 @@ class TableBuilder
     private string $cssClassPrefix;
     private int $perPage;
 
-    /** @var Column[] */
+    /** @var Column[] Auto-generated columns (built at build() time) */
     private array $columns = [];
 
-    /** @var array<int, array<string, mixed>> */
+    /** @var array<string, array> User-provided column options, keyed by column key */
+    private array $columnOptions = [];
+
+    /** @var array<int, array<string, mixed>> Normalized data rows */
     private array $data = [];
+
+    /** @var string[] All unique keys detected from data */
+    private array $detectedKeys = [];
 
     private int $page = 1;
     private int $totalItems = 0;
@@ -42,7 +48,9 @@ class TableBuilder
     {
         $this->id = $id;
         $this->columns = [];
+        $this->columnOptions = [];
         $this->data = [];
+        $this->detectedKeys = [];
         $this->page = 1;
         $this->totalItems = 0;
         $this->totalExplicitlySet = false;
@@ -54,7 +62,25 @@ class TableBuilder
     }
 
     /**
+     * Set the data rows. Columns are auto-detected from the data keys.
+     * Each element can be an associative array or an object (getters/public properties).
+     */
+    public function setData(iterable $data): self
+    {
+        $this->data = $this->normalizeData($data);
+        $this->detectedKeys = $this->detectKeys($this->data);
+
+        return $this;
+    }
+
+    /**
+     * Configure a specific column (optional).
+     * If the column key exists in the data, its options will be applied.
+     * If the column key does not exist, it will be ignored.
+     *
+     * @param string $key     The data key (must match a key found in the data)
      * @param array{
+     *     label?: string,
      *     sortable?: bool,
      *     filterable?: bool,
      *     filter_type?: string,
@@ -63,17 +89,11 @@ class TableBuilder
      *     formatter?: \Closure
      * } $options
      */
-    public function addColumn(string $key, string $label, array $options = []): self
+    public function configureColumn(string $key, array $options = []): self
     {
-        $this->columns[] = new Column(
-            key: $key,
-            label: $label,
-            sortable: $options['sortable'] ?? false,
-            filterable: $options['filterable'] ?? false,
-            filterType: $options['filter_type'] ?? null,
-            filterOptions: $options['filter_options'] ?? [],
-            cssClass: $options['css_class'] ?? null,
-            formatter: $options['formatter'] ?? null,
+        $this->columnOptions[$key] = array_merge(
+            $this->columnOptions[$key] ?? [],
+            $options
         );
 
         return $this;
@@ -87,13 +107,6 @@ class TableBuilder
             );
         }
         $this->mode = $mode;
-
-        return $this;
-    }
-
-    public function setData(iterable $data): self
-    {
-        $this->data = $this->normalizeData($data);
 
         return $this;
     }
@@ -114,6 +127,9 @@ class TableBuilder
 
     public function handleRequest(Request $request): self
     {
+        // Must build columns first so we can validate sort/filter fields
+        $this->buildColumns();
+
         // Sort params
         $sort = $request->query->get('sort');
         $direction = $request->query->get('direction', 'asc');
@@ -145,22 +161,20 @@ class TableBuilder
 
     public function build(): TableView
     {
+        // Build columns from detected keys + user options (if not already done by handleRequest)
+        $this->buildColumns();
+
         $allRows = $this->data;
         $processedRows = $allRows;
 
         if ($this->mode === 'server') {
-            // Apply server-side filtering
             $processedRows = $this->applyFilters($processedRows);
 
-            // If total was not explicitly set, compute it after filtering
             if (!$this->totalExplicitlySet) {
                 $this->totalItems = count($processedRows);
             }
 
-            // Apply server-side sorting
             $processedRows = $this->applySorting($processedRows);
-
-            // Apply server-side pagination
             $processedRows = $this->applyPagination($processedRows);
         }
 
@@ -221,6 +235,66 @@ class TableBuilder
     // Private helpers
     // -----------------------------------------------------------------------
 
+    /**
+     * Auto-generate Column objects from detected keys, merging user-provided options.
+     */
+    private function buildColumns(): void
+    {
+        // Don't rebuild if already built with the same keys
+        if (!empty($this->columns)) {
+            return;
+        }
+
+        $this->columns = [];
+        foreach ($this->detectedKeys as $key) {
+            $options = $this->columnOptions[$key] ?? [];
+
+            $this->columns[] = new Column(
+                key: $key,
+                label: $options['label'] ?? $this->humanizeKey($key),
+                sortable: $options['sortable'] ?? false,
+                filterable: $options['filterable'] ?? false,
+                filterType: $options['filter_type'] ?? null,
+                filterOptions: $options['filter_options'] ?? [],
+                cssClass: $options['css_class'] ?? null,
+                formatter: $options['formatter'] ?? null,
+            );
+        }
+    }
+
+    /**
+     * Scan all rows to find every unique key.
+     *
+     * @return string[]
+     */
+    private function detectKeys(array $rows): array
+    {
+        $keys = [];
+        foreach ($rows as $row) {
+            foreach (array_keys($row) as $key) {
+                if (!in_array($key, $keys, true)) {
+                    $keys[] = $key;
+                }
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Transform a snake_case or camelCase key into a human-readable label.
+     * Examples: 'created_at' -> 'Created at', 'firstName' -> 'First name', 'email' -> 'Email'
+     */
+    private function humanizeKey(string $key): string
+    {
+        // camelCase -> snake_case
+        $snake = strtolower(preg_replace('/[A-Z]/', '_$0', $key));
+        // snake_case -> words
+        $words = str_replace('_', ' ', trim($snake, '_'));
+
+        return ucfirst($words);
+    }
+
     private function normalizeData(iterable $data): array
     {
         $rows = [];
@@ -235,24 +309,45 @@ class TableBuilder
         return $rows;
     }
 
+    /**
+     * Convert an object to an associative array by extracting all accessible properties.
+     * Uses public properties, then getter methods (getX, isX, hasX).
+     */
     private function objectToArray(object $obj): array
     {
         $row = [];
-        foreach ($this->columns as $column) {
-            $key = $column->getKey();
 
-            if (isset($obj->$key)) {
-                $row[$key] = $obj->$key;
-            } else {
-                $getter = 'get' . ucfirst($key);
-                $isser = 'is' . ucfirst($key);
+        // Public properties
+        $reflection = new \ReflectionClass($obj);
+        foreach ($reflection->getProperties(\ReflectionProperty::IS_PUBLIC) as $prop) {
+            if (!$prop->isStatic()) {
+                $row[$prop->getName()] = $prop->getValue($obj);
+            }
+        }
 
-                if (method_exists($obj, $getter)) {
-                    $row[$key] = $obj->$getter();
-                } elseif (method_exists($obj, $isser)) {
-                    $row[$key] = $obj->$isser();
-                } else {
-                    $row[$key] = null;
+        // Getter methods (getX, isX, hasX) — only if no public properties were found
+        // or to supplement them
+        foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            if ($method->isStatic() || $method->getNumberOfRequiredParameters() > 0) {
+                continue;
+            }
+
+            $name = $method->getName();
+            $propertyKey = null;
+
+            if (str_starts_with($name, 'get') && $name !== 'getClass') {
+                $propertyKey = lcfirst(substr($name, 3));
+            } elseif (str_starts_with($name, 'is')) {
+                $propertyKey = lcfirst(substr($name, 2));
+            } elseif (str_starts_with($name, 'has')) {
+                $propertyKey = lcfirst(substr($name, 3));
+            }
+
+            if ($propertyKey !== null && !array_key_exists($propertyKey, $row)) {
+                try {
+                    $row[$propertyKey] = $method->invoke($obj);
+                } catch (\Throwable) {
+                    // Skip methods that throw
                 }
             }
         }
