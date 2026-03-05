@@ -15,6 +15,7 @@ class TableView
      * @param array      $activeFilters
      * @param string     $cssClassPrefix
      * @param array[]    $allRows        Full dataset (client mode only)
+     * @param ?string    $headerClass    Global CSS class applied to all <th> elements
      */
     public function __construct(
         private readonly string $id,
@@ -27,6 +28,7 @@ class TableView
         private readonly array $activeFilters = [],
         private readonly string $cssClassPrefix = 'owl-table',
         private readonly array $allRows = [],
+        private readonly ?string $headerClass = null,
     ) {
     }
 
@@ -79,6 +81,11 @@ class TableView
     public function getAllRows(): array
     {
         return $this->allRows;
+    }
+
+    public function getHeaderClass(): ?string
+    {
+        return $this->headerClass;
     }
 
     public function isServerMode(): bool

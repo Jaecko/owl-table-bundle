@@ -12,6 +12,7 @@ class Column
         private readonly ?string $filterType = null,
         private readonly array $filterOptions = [],
         private readonly ?string $cssClass = null,
+        private readonly ?string $headerClass = null,
         private readonly ?\Closure $formatter = null,
     ) {
     }
@@ -49,6 +50,11 @@ class Column
     public function getCssClass(): ?string
     {
         return $this->cssClass;
+    }
+
+    public function getHeaderClass(): ?string
+    {
+        return $this->headerClass;
     }
 
     public function formatValue(mixed $value): string

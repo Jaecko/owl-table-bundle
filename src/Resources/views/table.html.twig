@@ -14,7 +14,7 @@
         <thead class="{{ prefix }}__head">
             <tr class="{{ prefix }}__head-row">
                 {% for column in table.columns %}
-                    <th class="{{ prefix }}__th{{ column.cssClass ? ' ' ~ column.cssClass : '' }}{% if column.sortable %} {{ prefix }}__th--sortable{% endif %}{% if table.sortField == column.key %} {{ prefix }}__th--sorted {{ prefix }}__th--{{ table.sortDirection }}{% endif %}"
+                    <th class="{{ prefix }}__th{{ table.headerClass ? ' ' ~ table.headerClass : '' }}{{ column.headerClass ? ' ' ~ column.headerClass : '' }}{{ column.cssClass ? ' ' ~ column.cssClass : '' }}{% if column.sortable %} {{ prefix }}__th--sortable{% endif %}{% if table.sortField == column.key %} {{ prefix }}__th--sorted {{ prefix }}__th--{{ table.sortDirection }}{% endif %}"
                         {% if column.sortable %}
                             data-sort-key="{{ column.key }}"
                         {% endif %}

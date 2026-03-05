@@ -37,6 +37,9 @@ class TableBuilder
     private string $sortDirection = 'asc';
     private array $activeFilters = [];
 
+    /** @var ?string Global CSS class applied to all <th> elements */
+    private ?string $headerClass = null;
+
     public function __construct(
         string $defaultMode = 'server',
         int $defaultPerPage = 20,
@@ -61,6 +64,7 @@ class TableBuilder
         $this->sortField = null;
         $this->sortDirection = 'asc';
         $this->activeFilters = [];
+        $this->headerClass = null;
 
         return $this;
     }
@@ -221,6 +225,48 @@ class TableBuilder
     }
 
     /**
+     * Set a global CSS class applied to ALL <th> header cells.
+     *
+     *   ->setHeaderClass('bg-dark text-white')
+     */
+    public function setHeaderClass(string $class): self
+    {
+        $this->headerClass = $class;
+
+        return $this;
+    }
+
+    /**
+     * Set CSS classes on specific <th> header cells.
+     *
+     * Two modes:
+     *   - Associative: keys are column keys, values are CSS classes.
+     *     ->setHeaderClasses(['name' => 'w-50', 'email' => 'w-25'])
+     *
+     *   - Indexed: classes applied in the order of detected columns.
+     *     ->setHeaderClasses(['w-50', 'w-25', '', 'w-25'])
+     *
+     * @param array<string|int, string> $classes
+     */
+    public function setHeaderClasses(array $classes): self
+    {
+        if ($this->isAssociativeArray($classes)) {
+            foreach ($classes as $key => $cssClass) {
+                $this->mergeColumnOption($key, 'header_class', $cssClass);
+            }
+        } else {
+            $keys = $this->detectedKeys;
+            foreach ($classes as $index => $cssClass) {
+                if (isset($keys[$index]) && $cssClass !== '') {
+                    $this->mergeColumnOption($keys[$index], 'header_class', $cssClass);
+                }
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * Configure a specific column (optional).
      * If the column key exists in the data, its options will be applied.
      * If the column key does not exist, it will be ignored.
@@ -359,6 +405,7 @@ class TableBuilder
             activeFilters: $this->activeFilters,
             cssClassPrefix: $this->cssClassPrefix,
             allRows: $this->mode === 'client' ? $allRows : [],
+            headerClass: $this->headerClass,
         );
     }
 
@@ -421,6 +468,7 @@ class TableBuilder
                 filterType: $options['filter_type'] ?? null,
                 filterOptions: $options['filter_options'] ?? [],
                 cssClass: $options['css_class'] ?? null,
+                headerClass: $options['header_class'] ?? null,
                 formatter: $options['formatter'] ?? null,
             );
         }

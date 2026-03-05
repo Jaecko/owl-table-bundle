@@ -170,6 +170,8 @@ $table = $tableBuilder->create('users_table')
 | `setFilterOptions()` | — | `['role' => ['Admin', 'User']]` |
 | `setFormatters()` | — | `['price' => fn($v) => ...]` |
 | `setCssClasses()` | `['bold', '', 'right']` (dans l'ordre) | `['name' => 'bold']` |
+| `setHeaderClass()` | — | Classe globale sur tous les `<th>` : `'bg-dark text-white'` |
+| `setHeaderClasses()` | `['w-50', 'w-25', '', 'w-25']` (dans l'ordre) | `['name' => 'w-50']` |
 
 #### Configurer colonne par colonne (avancé)
 
@@ -438,6 +440,8 @@ $table = $tableBuilder->create('users_table')
 | `setFilterOptions()` | — | `['role' => ['Admin', 'User']]` |
 | `setFormatters()` | — | `['price' => fn($v) => ...]` |
 | `setCssClasses()` | `['bold', '', 'right']` (in order) | `['name' => 'bold']` |
+| `setHeaderClass()` | — | Global class on all `<th>`: `'bg-dark text-white'` |
+| `setHeaderClasses()` | `['w-50', 'w-25', '', 'w-25']` (in order) | `['name' => 'w-50']` |
 
 #### Configure column by column (advanced)
 
