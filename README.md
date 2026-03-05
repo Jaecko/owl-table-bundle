@@ -145,53 +145,47 @@ $table = $tableBuilder->create('users_table')
 
 > En mode indexé, les labels sont appliqués dans l'ordre des clés détectées. Vous pouvez ne renommer que les premières colonnes : `->setLabels(['Nom', 'Courriel'])` ne renomme que les 2 premières.
 
-#### Configurer certaines colonnes (optionnel)
+#### Configurer par tableaux (rapide)
 
-Utilisez `configureColumn()` pour ajouter du tri, des filtres ou un label personnalisé sur des colonnes spécifiques :
+Chaque aspect est configurable via sa propre méthode, sans toucher à `configureColumn()` :
 
 ```php
 $table = $tableBuilder->create('users_table')
     ->setData($users)
-    ->configureColumn('name', [
-        'label' => 'Nom',
-        'sortable' => true,
-        'filterable' => true,
-        'filter_type' => 'text',
-    ])
-    ->configureColumn('email', [
-        'sortable' => true,
-    ])
-    ->configureColumn('role', [
-        'label' => 'Rôle',
-        'filterable' => true,
-        'filter_type' => 'select',
-        'filter_options' => ['Admin', 'User', 'Editor'],
-    ])
-    ->configureColumn('created_at', [
-        'label' => 'Créé le',
-        'sortable' => true,
-        'filterable' => true,
-        'filter_type' => 'date_range',
-    ])
+    ->setLabels(['Nom', 'Email', 'Rôle', 'Créé le'])
+    ->setSortable(['name', 'email', 'created_at'])
+    ->setFilterable(['name' => 'text', 'role' => 'select', 'created_at' => 'date_range'])
+    ->setFilterOptions(['role' => ['Admin', 'User', 'Editor']])
+    ->setFormatters(['created_at' => fn($v) => date('d/m/Y', strtotime($v))])
     ->setMode('server')
-    ->setPagination(page: $request->query->getInt('page', 1), perPage: 20)
     ->handleRequest($request)
     ->build();
 ```
 
-> Seules les colonnes que vous voulez personnaliser ont besoin de `configureColumn()`. Les autres s'affichent automatiquement avec un label déduit de la clé.
+| Méthode | Mode indexé | Mode associatif |
+|---------|-------------|-----------------|
+| `setLabels()` | `['Nom', 'Email']` (dans l'ordre) | `['name' => 'Nom']` (par clé) |
+| `setSortable()` | `['name', 'email']` (ces clés deviennent triables) | — |
+| `setFilterable()` | `['name', 'role']` (type `text` par défaut) | `['name' => 'text', 'role' => 'select']` |
+| `setFilterOptions()` | — | `['role' => ['Admin', 'User']]` |
+| `setFormatters()` | — | `['price' => fn($v) => ...]` |
+| `setCssClasses()` | `['bold', '', 'right']` (dans l'ordre) | `['name' => 'bold']` |
 
-#### Options de `configureColumn()`
+#### Configurer colonne par colonne (avancé)
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `label` | `string` | Label personnalisé pour l'en-tête (sinon auto-généré depuis la clé) |
-| `sortable` | `bool` | Activer le tri sur cette colonne |
-| `filterable` | `bool` | Activer un filtre sur cette colonne |
-| `filter_type` | `string` | Type de filtre : `text`, `select`, `date_range` |
-| `filter_options` | `array` | Valeurs possibles pour un filtre `select` |
-| `css_class` | `string` | Classe CSS supplémentaire sur les cellules |
-| `formatter` | `Closure` | Fonction de formatage de la valeur affichée |
+`configureColumn()` reste disponible pour tout regrouper sur une colonne :
+
+```php
+->configureColumn('role', [
+    'label' => 'Rôle',
+    'filterable' => true,
+    'filter_type' => 'select',
+    'filter_options' => ['Admin', 'User'],
+    'css_class' => 'text-center',
+])
+```
+
+> **Priorité** : `configureColumn()` > `setLabels()` / `setSortable()` / etc. > auto-détection
 
 #### Colonnes avec des données hétérogènes
 
@@ -236,20 +230,17 @@ $users = $userRepository->findAll();
 // Les colonnes sont détectées via getName(), getEmail(), getRole(), etc.
 $table = $tableBuilder->create('users_table')
     ->setData($users)
-    ->configureColumn('name', ['sortable' => true])
-    ->configureColumn('email', ['sortable' => true])
+    ->setSortable(['name', 'email'])
     ->build();
 ```
 
-#### Formateur personnalisé
+#### Formateurs personnalisés
 
 ```php
-->configureColumn('price', [
-    'sortable' => true,
-    'formatter' => fn($value) => number_format($value, 2, ',', ' ') . ' €',
-])
-->configureColumn('active', [
-    'formatter' => fn($value) => $value ? 'Oui' : 'Non',
+->setFormatters([
+    'price' => fn($v) => number_format($v, 2, ',', ' ') . ' €',
+    'active' => fn($v) => $v ? 'Oui' : 'Non',
+    'created_at' => fn($v) => $v instanceof \DateTimeInterface ? $v->format('d/m/Y') : $v,
 ])
 ```
 
@@ -278,8 +269,8 @@ En mode serveur avec une base de données, utilisez les accesseurs du builder po
 ```php
 $table = $tableBuilder->create('users_table')
     ->setData([]) // données vides pour l'instant
-    ->configureColumn('name', ['sortable' => true, 'filterable' => true, 'filter_type' => 'text'])
-    ->configureColumn('email', ['sortable' => true])
+    ->setSortable(['name', 'email'])
+    ->setFilterable(['name' => 'text'])
     ->setMode('server')
     ->handleRequest($request);
 
@@ -422,52 +413,47 @@ $table = $tableBuilder->create('users_table')
 
 > In indexed mode, labels are applied in the order of detected keys. You can rename only the first columns: `->setLabels(['Full Name', 'Email Address'])` only renames the first 2.
 
-#### Configure specific columns (optional)
+#### Configure with arrays (quick)
 
-Use `configureColumn()` to add sorting, filters, or a custom label to specific columns:
+Each aspect has its own method, no need for `configureColumn()`:
 
 ```php
 $table = $tableBuilder->create('users_table')
     ->setData($users)
-    ->configureColumn('name', [
-        'label' => 'Full Name',
-        'sortable' => true,
-        'filterable' => true,
-        'filter_type' => 'text',
-    ])
-    ->configureColumn('email', [
-        'sortable' => true,
-    ])
-    ->configureColumn('role', [
-        'filterable' => true,
-        'filter_type' => 'select',
-        'filter_options' => ['Admin', 'User', 'Editor'],
-    ])
-    ->configureColumn('created_at', [
-        'label' => 'Created at',
-        'sortable' => true,
-        'filterable' => true,
-        'filter_type' => 'date_range',
-    ])
+    ->setLabels(['Full Name', 'Email', 'Role', 'Joined'])
+    ->setSortable(['name', 'email', 'created_at'])
+    ->setFilterable(['name' => 'text', 'role' => 'select', 'created_at' => 'date_range'])
+    ->setFilterOptions(['role' => ['Admin', 'User', 'Editor']])
+    ->setFormatters(['created_at' => fn($v) => date('M d, Y', strtotime($v))])
     ->setMode('server')
-    ->setPagination(page: $request->query->getInt('page', 1), perPage: 20)
     ->handleRequest($request)
     ->build();
 ```
 
-> Only the columns you want to customize need `configureColumn()`. All others display automatically with a label derived from the key.
+| Method | Indexed mode | Associative mode |
+|--------|-------------|-----------------|
+| `setLabels()` | `['Name', 'Email']` (in order) | `['name' => 'Name']` (by key) |
+| `setSortable()` | `['name', 'email']` (these keys become sortable) | — |
+| `setFilterable()` | `['name', 'role']` (default `text` type) | `['name' => 'text', 'role' => 'select']` |
+| `setFilterOptions()` | — | `['role' => ['Admin', 'User']]` |
+| `setFormatters()` | — | `['price' => fn($v) => ...]` |
+| `setCssClasses()` | `['bold', '', 'right']` (in order) | `['name' => 'bold']` |
 
-#### `configureColumn()` options
+#### Configure column by column (advanced)
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `label` | `string` | Custom header label (otherwise auto-generated from key) |
-| `sortable` | `bool` | Enable sorting on this column |
-| `filterable` | `bool` | Enable a filter on this column |
-| `filter_type` | `string` | Filter type: `text`, `select`, `date_range` |
-| `filter_options` | `array` | Possible values for a `select` filter |
-| `css_class` | `string` | Extra CSS class on cells |
-| `formatter` | `Closure` | Custom value formatting function |
+`configureColumn()` is still available to group all options on a single column:
+
+```php
+->configureColumn('role', [
+    'label' => 'Role',
+    'filterable' => true,
+    'filter_type' => 'select',
+    'filter_options' => ['Admin', 'User'],
+    'css_class' => 'text-center',
+])
+```
+
+> **Priority**: `configureColumn()` > `setLabels()` / `setSortable()` / etc. > auto-detection
 
 #### Heterogeneous data
 
@@ -512,20 +498,17 @@ $users = $userRepository->findAll();
 // Columns are detected via getName(), getEmail(), getRole(), etc.
 $table = $tableBuilder->create('users_table')
     ->setData($users)
-    ->configureColumn('name', ['sortable' => true])
-    ->configureColumn('email', ['sortable' => true])
+    ->setSortable(['name', 'email'])
     ->build();
 ```
 
-#### Custom formatter
+#### Custom formatters
 
 ```php
-->configureColumn('price', [
-    'sortable' => true,
-    'formatter' => fn($value) => '$' . number_format($value, 2),
-])
-->configureColumn('active', [
-    'formatter' => fn($value) => $value ? 'Yes' : 'No',
+->setFormatters([
+    'price' => fn($v) => '$' . number_format($v, 2),
+    'active' => fn($v) => $v ? 'Yes' : 'No',
+    'created_at' => fn($v) => $v instanceof \DateTimeInterface ? $v->format('M d, Y') : $v,
 ])
 ```
 
@@ -554,8 +537,8 @@ In server mode with a database, use the builder's accessors to build your querie
 ```php
 $table = $tableBuilder->create('users_table')
     ->setData([]) // empty data for now
-    ->configureColumn('name', ['sortable' => true, 'filterable' => true, 'filter_type' => 'text'])
-    ->configureColumn('email', ['sortable' => true])
+    ->setSortable(['name', 'email'])
+    ->setFilterable(['name' => 'text'])
     ->setMode('server')
     ->handleRequest($request);
 

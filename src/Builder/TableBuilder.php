@@ -109,6 +109,118 @@ class TableBuilder
     }
 
     /**
+     * Define which columns are sortable.
+     *
+     *   ->setSortable(['name', 'email', 'created_at'])
+     *
+     * @param string[] $keys Column keys that should be sortable
+     */
+    public function setSortable(array $keys): self
+    {
+        foreach ($keys as $key) {
+            $this->mergeColumnOption($key, 'sortable', true);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Define which columns are filterable.
+     *
+     * Two modes:
+     *   - Indexed: columns become filterable with default 'text' type.
+     *     ->setFilterable(['name', 'role'])
+     *
+     *   - Associative: keys are column keys, values are filter types.
+     *     ->setFilterable(['name' => 'text', 'role' => 'select', 'created_at' => 'date_range'])
+     *
+     * @param array<string|int, string> $columns
+     */
+    public function setFilterable(array $columns): self
+    {
+        if ($this->isAssociativeArray($columns)) {
+            // ['name' => 'text', 'role' => 'select']
+            foreach ($columns as $key => $filterType) {
+                $this->mergeColumnOption($key, 'filterable', true);
+                $this->mergeColumnOption($key, 'filter_type', $filterType);
+            }
+        } else {
+            // ['name', 'role'] → default 'text'
+            foreach ($columns as $key) {
+                $this->mergeColumnOption($key, 'filterable', true);
+                $this->mergeColumnOption($key, 'filter_type', 'text');
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Set filter options for 'select' type filters.
+     *
+     *   ->setFilterOptions(['role' => ['Admin', 'User', 'Editor'], 'status' => ['Active', 'Inactive']])
+     *
+     * @param array<string, string[]> $options Column key => array of possible values
+     */
+    public function setFilterOptions(array $options): self
+    {
+        foreach ($options as $key => $values) {
+            $this->mergeColumnOption($key, 'filter_options', $values);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Set custom formatters for columns.
+     *
+     *   ->setFormatters([
+     *       'price' => fn($v) => number_format($v, 2, ',', ' ') . ' €',
+     *       'active' => fn($v) => $v ? 'Oui' : 'Non',
+     *   ])
+     *
+     * @param array<string, \Closure> $formatters Column key => formatter closure
+     */
+    public function setFormatters(array $formatters): self
+    {
+        foreach ($formatters as $key => $formatter) {
+            $this->mergeColumnOption($key, 'formatter', $formatter);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Set CSS classes on columns.
+     *
+     * Two modes:
+     *   - Associative: keys are column keys, values are CSS classes.
+     *     ->setCssClasses(['name' => 'text-bold', 'email' => 'text-muted'])
+     *
+     *   - Indexed: classes applied in the order of detected columns.
+     *     ->setCssClasses(['text-bold', 'text-muted', '', 'text-right'])
+     *
+     * @param array<string|int, string> $classes
+     */
+    public function setCssClasses(array $classes): self
+    {
+        if ($this->isAssociativeArray($classes)) {
+            foreach ($classes as $key => $cssClass) {
+                $this->mergeColumnOption($key, 'css_class', $cssClass);
+            }
+        } else {
+            $keys = $this->detectedKeys;
+            foreach ($classes as $index => $cssClass) {
+                if (isset($keys[$index]) && $cssClass !== '') {
+                    $this->mergeColumnOption($keys[$index], 'css_class', $cssClass);
+                }
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * Configure a specific column (optional).
      * If the column key exists in the data, its options will be applied.
      * If the column key does not exist, it will be ignored.
@@ -132,6 +244,17 @@ class TableBuilder
         );
 
         return $this;
+    }
+
+    /**
+     * Merge a single option into a column's options array.
+     */
+    private function mergeColumnOption(string $key, string $option, mixed $value): void
+    {
+        if (!isset($this->columnOptions[$key])) {
+            $this->columnOptions[$key] = [];
+        }
+        $this->columnOptions[$key][$option] = $value;
     }
 
     public function setMode(string $mode): self
