@@ -1,6 +1,6 @@
 {
     "name": "owl-concept/table-bundle",
-    "description": "A reusable Twig component for generating dynamic HTML tables in Symfony",
+    "description": "Bundle Symfony pour la génération dynamique de tableaux HTML avec tri, filtres et pagination (mode serveur & client) | Symfony bundle for dynamic HTML table generation with sorting, filtering and pagination (server & client mode)",
     "type": "symfony-bundle",
     "license": "proprietary",
     "require": {
