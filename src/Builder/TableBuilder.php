@@ -20,6 +20,9 @@ class TableBuilder
     /** @var array<string, array> User-provided column options, keyed by column key */
     private array $columnOptions = [];
 
+    /** @var array<string, string> User-provided labels, keyed by column key */
+    private array $labels = [];
+
     /** @var array<int, array<string, mixed>> Normalized data rows */
     private array $data = [];
 
@@ -49,6 +52,7 @@ class TableBuilder
         $this->id = $id;
         $this->columns = [];
         $this->columnOptions = [];
+        $this->labels = [];
         $this->data = [];
         $this->detectedKeys = [];
         $this->page = 1;
@@ -69,6 +73,37 @@ class TableBuilder
     {
         $this->data = $this->normalizeData($data);
         $this->detectedKeys = $this->detectKeys($this->data);
+
+        return $this;
+    }
+
+    /**
+     * Set custom labels for columns.
+     *
+     * Supports two modes:
+     *   - Associative array: keys are column keys, values are labels.
+     *     ->setLabels(['name' => 'Nom', 'created_at' => 'Créé le'])
+     *
+     *   - Indexed array: labels are applied in the order of detected columns.
+     *     ->setLabels(['Nom', 'Email', 'Rôle', 'Créé le'])
+     *
+     * @param array<string|int, string> $labels
+     */
+    public function setLabels(array $labels): self
+    {
+        // Detect if associative or indexed
+        if ($this->isAssociativeArray($labels)) {
+            // Associative: ['name' => 'Nom', 'email' => 'Email']
+            $this->labels = $labels;
+        } else {
+            // Indexed: ['Nom', 'Email', 'Rôle'] → map to detected keys in order
+            $keys = $this->detectedKeys;
+            foreach ($labels as $index => $label) {
+                if (isset($keys[$index])) {
+                    $this->labels[$keys[$index]] = $label;
+                }
+            }
+        }
 
         return $this;
     }
@@ -236,7 +271,8 @@ class TableBuilder
     // -----------------------------------------------------------------------
 
     /**
-     * Auto-generate Column objects from detected keys, merging user-provided options.
+     * Auto-generate Column objects from detected keys, merging user-provided labels and options.
+     * Priority for label: configureColumn 'label' > setLabels() > auto-humanized key.
      */
     private function buildColumns(): void
     {
@@ -249,9 +285,14 @@ class TableBuilder
         foreach ($this->detectedKeys as $key) {
             $options = $this->columnOptions[$key] ?? [];
 
+            // Label priority: configureColumn('label') > setLabels() > humanizeKey()
+            $label = $options['label']
+                ?? $this->labels[$key]
+                ?? $this->humanizeKey($key);
+
             $this->columns[] = new Column(
                 key: $key,
-                label: $options['label'] ?? $this->humanizeKey($key),
+                label: $label,
                 sortable: $options['sortable'] ?? false,
                 filterable: $options['filterable'] ?? false,
                 filterType: $options['filter_type'] ?? null,
@@ -260,6 +301,15 @@ class TableBuilder
                 formatter: $options['formatter'] ?? null,
             );
         }
+    }
+
+    private function isAssociativeArray(array $arr): bool
+    {
+        if (empty($arr)) {
+            return false;
+        }
+
+        return !array_is_list($arr);
     }
 
     /**

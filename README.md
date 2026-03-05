@@ -125,6 +125,26 @@ public function list(TableBuilder $tableBuilder): Response
 
 > Les en-têtes sont générés automatiquement : `created_at` → **Created at**, `firstName` → **First name**, `email` → **Email**
 
+#### Renommer les colonnes avec `setLabels()`
+
+Deux syntaxes possibles :
+
+```php
+// Mode associatif — par clé
+$table = $tableBuilder->create('users_table')
+    ->setData($users)
+    ->setLabels(['name' => 'Nom', 'email' => 'Courriel', 'role' => 'Rôle', 'created_at' => 'Créé le'])
+    ->build();
+
+// Mode indexé — dans l'ordre des colonnes détectées
+$table = $tableBuilder->create('users_table')
+    ->setData($users)
+    ->setLabels(['Nom', 'Courriel', 'Rôle', 'Créé le'])
+    ->build();
+```
+
+> En mode indexé, les labels sont appliqués dans l'ordre des clés détectées. Vous pouvez ne renommer que les premières colonnes : `->setLabels(['Nom', 'Courriel'])` ne renomme que les 2 premières.
+
 #### Configurer certaines colonnes (optionnel)
 
 Utilisez `configureColumn()` pour ajouter du tri, des filtres ou un label personnalisé sur des colonnes spécifiques :
@@ -381,6 +401,26 @@ public function list(TableBuilder $tableBuilder): Response
 ```
 
 > Headers are generated automatically: `created_at` → **Created at**, `firstName` → **First name**, `email` → **Email**
+
+#### Rename columns with `setLabels()`
+
+Two syntaxes available:
+
+```php
+// Associative mode — by key
+$table = $tableBuilder->create('users_table')
+    ->setData($users)
+    ->setLabels(['name' => 'Full Name', 'email' => 'Email Address', 'created_at' => 'Joined'])
+    ->build();
+
+// Indexed mode — in order of detected columns
+$table = $tableBuilder->create('users_table')
+    ->setData($users)
+    ->setLabels(['Full Name', 'Email Address', 'Role', 'Joined'])
+    ->build();
+```
+
+> In indexed mode, labels are applied in the order of detected keys. You can rename only the first columns: `->setLabels(['Full Name', 'Email Address'])` only renames the first 2.
 
 #### Configure specific columns (optional)
 
